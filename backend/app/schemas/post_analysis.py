@@ -16,8 +16,15 @@ class PostAnalysisBase(BaseModel):
     virality_score: float = 0.0
     virality_level: str = "Low"
     is_viral: bool = False
+    attention_score: float = 0.0
+    attention_level: str = "Low attention"
+    attention_reasons: list[str] = []
+    reputation_risk_score: float = 0.0
+    reputation_risk_level: str = "Monitor"
     analysis_version: str = "1.0"
-    model_used: str = "vader_local"
+    model_used: str = "gemini"
+    analysis_provider: str = "gemini"
+    analysis_status: str = "pending"
 
 
 class PostAnalysisCreate(PostAnalysisBase):
@@ -44,6 +51,8 @@ class AIAnalysisItem(BaseModel):
     key_positive: Optional[str] = Field(default=None, description="Key positive aspect mentioned")
     key_negative: Optional[str] = Field(default=None, description="Key negative aspect or complaint mentioned")
     recommendation: str = Field(description="1-2 sentence actionable marketing/business recommendation")
+    analysis_provider: str = "gemini"
+    analysis_status: str = "completed"
 
     model_config = ConfigDict(extra="forbid")
 

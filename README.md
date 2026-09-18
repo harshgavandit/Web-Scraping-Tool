@@ -1,8 +1,8 @@
-# Brand Chatter & Social Listening Platform
+# Brand Chatter — Google Brand Intelligence
 
-An end-to-end, low-cost social listening and brand intelligence dashboard designed for brand managers and marketing teams (demonstrated with **Nike** and its primary competitors: **Adidas, Puma, New Balance, and Under Armour**).
+An end-to-end brand intelligence dashboard for marketing teams, demonstrated with **Nike**. It collects only real, publicly accessible pages through Google Search, Google News RSS, and curated publisher RSS/Atom feeds; it preserves original links and evidence, extracts product feedback, and turns it into auditable recommendations.
 
-The platform transforms thousands of noisy social conversations into **one unified, actionable dashboard** centered around a core hero table, compact KPI metrics, and an executive AI brand pulse.
+The platform transforms noisy public-web coverage and customer feedback into **one unified, actionable dashboard** centered around a core intelligence table, compact KPI metrics, and an executive AI brand pulse.
 
 ---
 
@@ -10,14 +10,14 @@ The platform transforms thousands of noisy social conversations into **one unifi
 
 ```
                               ┌──────────────────────────────────────────────────────────┐
-                              │                    SOCIAL DATA SOURCES                   │
-                              │   Reddit API/Public | Facebook API/Mock | RSS / Web Feeds│
+                              │                    PUBLIC WEB SOURCES                    │
+                              │ Google Search API | Google News | Curated publisher RSS │
                               └────────────────────────────┬─────────────────────────────┘
                                                            │
                                                            ▼
                               ┌──────────────────────────────────────────────────────────┐
                               │                    MODULAR COLLECTORS                    │
-                              │   app/collectors/ (reddit, facebook, rss, web, mock)     │
+                              │ Google Search + Google News + publisher RSS/Atom adapters│
                               └────────────────────────────┬─────────────────────────────┘
                                                            │
                                                            ▼
@@ -27,7 +27,7 @@ The platform transforms thousands of noisy social conversations into **one unifi
                               │ 2. Deduplicate (source+id, canonical URL, SHA-256 hash)  │
                               │ 3. Relevance Filter (keyword/product/competitor context) │
                               │ 4. Local Sentiment (Free VADER - 0 API cost)             │
-                              │ 5. Virality Velocity Engine (momentum scoring 0-100)     │
+                              │ 5. Product/aspect evidence + observable attention score  │
                               │ 6. Batch High-Value Posts (configurable batch size = 20) │
                               │ 7. Gemini 3.8 Flash Analysis (structured JSON output)    │
                               │    ↳ Fallbacks: OpenAI (optional) or Local Heuristics    │
@@ -44,7 +44,7 @@ The platform transforms thousands of noisy social conversations into **one unifi
                               ┌──────────────────────────────────────────────────────────┐
                               │                   FASTAPI REST API                       │
                               │   /api/posts, /api/dashboard/summary, /api/topics        │
-                              │   /api/collection/run, /api/brands, /api/health          │
+                              │ /api/intelligence, /api/alerts, /api/audit, exports     │
                               └────────────────────────────┬─────────────────────────────┘
                                                            │
                                                            ▼
@@ -59,11 +59,15 @@ The platform transforms thousands of noisy social conversations into **one unifi
 
 ## Key Features
 
-- **The Main Hero Table**: Single source of truth displaying Source, Published Date, Post Content, Brand, Competitor, Topic, Sentiment, Engagement Breakdown, Virality Score, Trend Direction, AI Summary, and Actionable Marketing Recommendations.
-- **Executive AI Brand Pulse**: Automatically synthesizes brand sentiment distribution, fastest growing topic, and recommended strategic actions with intelligent caching (zero LLM calls on dashboard refresh).
-- **Virality Scoring Algorithm**: Identifies rapidly accelerating posts by analyzing engagement velocity per hour ($\text{engagement} / \text{age}$), volume, and debate ratios.
-- **Local + Gemini 3.8 Flash Sentiment**: Employs free local VADER for 90%+ of social volume, reserving Gemini 3.8 Flash for batched summaries, topics, and actionable recommendations with low-reasoning configuration.
-- **Modular Collector Architecture**: Pluggable adapters for Reddit, Facebook, RSS Feeds, Generic Web scraping, and high-fidelity mock feeds.
+- **The Main Intelligence Table**: Preserves publisher, publication date, original URL, topic, product, competitor, sentiment, AI summary, and recommended action while retaining server-side filters and pagination.
+- **Evidence-Backed Executive Pulse**: Synthesizes sentiment, top risks, source quotations, recommendation ownership, and P0/P1/P2 priority with data-version caching.
+- **Product and Reputation Intelligence**: Extracts product-level praise and complaints, aspect evidence, independent-source corroboration, attention, and reputation-risk clusters.
+- **Local + Gemini 3.8 Flash Analysis**: Employs free local VADER for sentiment, reserving Gemini for batched summaries, topics, and actionable recommendations with a deterministic local fallback.
+- **Real Google Discovery**: Google Search and Google News query brand presence, feedback, reviews, complaints, trending coverage, blogs, competitor comparisons, and configured products. No synthetic conversations are generated.
+- **Original-Page Evidence**: Respectful page fetching checks public-network targets and robots rules, validates every redirect, extracts canonical page content and structured review data, and stores immutable snapshots.
+- **Enterprise Workflow**: Team saved views, SMTP email alerts, in-app acknowledgement/resolution, CSV/PDF exports, discovery audit records, and per-analysis AI provider/model/status trails.
+- **Actionable Navigation & Filters**: Dashboard quick filters and sidebar views reset conflicting criteria, apply the appropriate server-side filters/sort order, and focus the conversation table. Topic and competitor chips can be toggled directly.
+- **Editable Brand Portfolio**: Brand Settings can add or remove tracked competitors, products, campaigns, and keywords. Duplicate entries are rejected case-insensitively and all mutations are persisted through the API.
 - **3-Layer Deduplication**: Prevents reprocessing via external IDs, normalized canonical URLs, and SHA-256 content hashing.
 - **Sub-150ms Performance**: Handles 10,000+ posts with server-side pagination, indexed joins, and zero N+1 queries.
 
@@ -77,15 +81,15 @@ The platform transforms thousands of noisy social conversations into **one unifi
 | **Backend** | Python 3.12+, FastAPI, SQLAlchemy 2.0, Pydantic v2, Alembic |
 | **Database** | PostgreSQL (Supabase compatible) / SQLite fallback |
 | **Sentiment** | VADER (`vaderSentiment`) + retail domain cues |
-| **Primary AI / LLM** | **Google Gemini 3.8 Flash** (`gemini-3.8-flash` via REST API) |
+| **Primary AI / LLM** | **Google Gemini 3.5 Flash** (`gemini-3.5-flash` via REST API) |
 | **Secondary AI Fallback**| OpenAI API (`gpt-4o-mini`) / Local Heuristic Parser |
-| **Scheduling** | APScheduler (in-process background scheduler) |
+| **Scheduling / Alerts** | APScheduler + SMTP email delivery |
 
 ---
 
 ## Cost-Saving Strategy
 
-Sending every single raw social post individually to a cloud LLM is prohibitively expensive. This platform enforces strict sequential processing to reduce AI inference costs by up to **95%**:
+Sending every discovered page individually to a cloud LLM is prohibitively expensive. This platform enforces strict sequential processing to reduce AI inference costs:
 
 ```text
 Collect
@@ -93,10 +97,11 @@ Collect
 → Deduplicate
 → Relevance filter
 → Local sentiment
-→ Virality calculation
+→ Original-page evidence extraction
+→ Product/aspect and attention scoring
 → Select important posts
 → Batch posts (AI_BATCH_SIZE = 20)
-→ Gemini 3.8 Flash (Low thinking/reasoning for bulk)
+→ Gemini 3.5 Flash (Low thinking/reasoning for bulk)
 → Store results
 → Dashboard (Cached serving)
 ```
@@ -161,7 +166,7 @@ pip install -r backend/requirements.txt
 # Run database migrations
 alembic -c backend/alembic.ini upgrade head
 
-# Seed Nike brand and 80+ realistic social records
+# Seed only the Nike brand, competitors, and tracked keywords
 python backend/seed_data.py
 
 # Start FastAPI development server
@@ -171,6 +176,12 @@ python -m uvicorn app.main:app --app-dir backend --reload --port 8000
 FastAPI will be running at `http://localhost:8000`.
 - API Health: `http://localhost:8000/api/health`
 - Interactive Swagger Docs: `http://localhost:8000/docs`
+
+With the backend running, collect current public news and web feedback from another terminal (or use the dashboard's **Data Collectors** dialog):
+
+```bash
+curl -X POST http://localhost:8000/api/collection/run -H "Content-Type: application/json" -d '{"source":"all","brand_id":1}'
+```
 
 ### 3. Frontend Setup
 
@@ -193,41 +204,38 @@ The React dashboard will be available at `http://localhost:5173`.
 | `DATABASE_URL` | `sqlite:///./brand_chatter.db` | PostgreSQL connection string or SQLite path |
 | `AI_PROVIDER` | `gemini` | Primary AI provider (`gemini` or `openai`) |
 | `GEMINI_API_KEY` | *Empty* | Google Gemini API Key (backend-only, offline fallback if unset) |
-| `GEMINI_MODEL` | `gemini-3.8-flash` | Configurable Gemini model identifier |
+| `GEMINI_MODEL` | `gemini-3.5-flash` | Configurable Gemini model identifier |
 | `AI_BATCH_SIZE` | `20` | Maximum posts per batch inference call |
 | `AI_ANALYSIS_ENABLED` | `true` | Enable or disable LLM enrichment |
 | `OPENAI_API_KEY` | *Empty* | Optional secondary fallback OpenAI API Key |
 | `OPENAI_MODEL` | `gpt-4o-mini` | Configurable OpenAI fallback model name |
-| `REDDIT_ENABLED` | `false` | Enable live Reddit collection |
-| `REDDIT_CLIENT_ID` | *Empty* | Reddit OAuth Client ID |
-| `REDDIT_CLIENT_SECRET` | *Empty* | Reddit OAuth Client Secret |
-| `REDDIT_USER_AGENT` | `BrandChatterBot/1.0` | Reddit User-Agent header |
-| `FACEBOOK_ENABLED` | `false` | Enable Facebook Graph API collection |
-| `FACEBOOK_ACCESS_TOKEN` | *Empty* | Facebook Graph API User/Page Token |
 | `RSS_ENABLED` | `true` | Enable Google News RSS collector |
+| `PUBLISHER_RSS_ENABLED` | `true` | Enable the curated Nike publisher RSS/Atom collector |
+| `PUBLISHER_RSS_FEEDS` | *Empty* | Optional newline-separated `Publisher name|feed URL` entries; overrides the curated Nike feeds |
+| `GOOGLE_SEARCH_ENABLED` | `false` | Enable the Google Search collector after API credentials are configured |
+| `GOOGLE_SEARCH_API_KEY` | *Empty* | Google Custom Search JSON API key (backend-only) |
+| `GOOGLE_SEARCH_ENGINE_ID` | *Empty* | Programmable Search Engine identifier (`cx`) |
+| `GOOGLE_SEARCH_COUNTRY` | `US` | Country used for Google discovery |
+| `GOOGLE_SEARCH_LANGUAGE` | `en` | Language used for Google discovery |
+| `PAGE_FETCH_ENABLED` | `true` | Fetch eligible original public pages for evidence extraction |
+| `PAGE_FETCH_LIMIT_PER_RUN` | `30` | Maximum original pages enriched during one collector run |
+| `EMAIL_ALERTS_ENABLED` | `false` | Enable reputation-risk email delivery |
+| `EMAIL_ALERT_RECIPIENTS` | *Empty* | Comma-separated brand/PR recipients |
+| `SMTP_HOST` | *Empty* | SMTP server hostname |
+| `SMTP_PORT` | `587` | SMTP server port |
+| `SMTP_USERNAME` | *Empty* | SMTP login username, when required |
+| `SMTP_PASSWORD` | *Empty* | SMTP login password or app password |
+| `SMTP_FROM_EMAIL` | *Empty* | Verified sender address |
+| `SMTP_USE_TLS` | `true` | Upgrade the SMTP connection with STARTTLS |
+| `APP_PUBLIC_URL` | `http://localhost:5173` | Dashboard URL placed in alert emails |
 | `COLLECTION_INTERVAL_MINUTES` | `60` | Background scheduler collection interval |
-| `VIRAL_THRESHOLD` | `85` | Virality score threshold for `is_viral=true` |
 | `CORS_ORIGINS` | `http://localhost:5173,...` | Allowed CORS origins (comma-separated) |
 
 ---
 
-## Virality Scoring Formula
+## Attention and Reputation Risk
 
-The platform prioritizes **momentum and engagement velocity** over historical total likes:
-
-$$\text{engagement} = \text{likes} + (2.5 \times \text{comments}) + (3.5 \times \text{shares})$$
-
-$$\text{age\_hours} = \max\left(\frac{\text{now} - \text{published\_at}}{3600}, 0.5\right)$$
-
-$$\text{velocity} = \frac{\text{engagement}}{\text{age\_hours}}$$
-
-- **Velocity Component (70%)**: Log/exponential curve mapping velocity to 0–100 points.
-- **Volume Component (30%)**: Logarithmic scaling for absolute size.
-- **Virality Levels**:
-  - `0 – 39`: **Low**
-  - `40 – 64`: **Medium**
-  - `65 – 84`: **High**
-  - `85 – 100`: **Viral** (`is_viral = true`)
+Google-indexed pages do not provide uniform likes, comments, or shares. The platform therefore avoids fabricated virality and calculates **attention** from observable signals: publication recency, Google result position, and published review volume where structured page data exposes it. Reputation risk is calculated only from negative evidence, independent-source diversity, growth, and extraction confidence. The exact reasons are stored with every score.
 
 ---
 
@@ -251,11 +259,18 @@ cd frontend
 npm run build
 ```
 
-### Benchmarking 10,000+ Records
-To test index and pagination responsiveness under heavy loads:
-```bash
-python backend/generate_bulk_test_data.py 10000
-```
+### Data provenance and audits
+
+- Every Google query and run is stored with category, locale, status, result counts, and errors; `/api/audit` exposes the source trail.
+- Each discovered result retains its Google rank, query, category, displayed domain, discovery timestamps, and original HTTP(S) URL.
+- Original-page documents record canonical URL, publisher, content status, robots decision, HTTP status, extracted structured review data, and content-hash snapshots.
+- Each AI result records provider, model, completion/fallback status, analysis version, source URL, and analysis timestamp. The post drawer displays this audit metadata.
+- Google News and Search do not consistently expose social engagement. Missing engagement remains zero and is never fabricated; those pages use observable attention signals such as recency, search position, and published review count.
+- Failed source, page, AI, and email operations are retained as operational/audit state rather than silently replaced with fake data.
+
+### Email alerts
+
+Email is disabled by default. Configure the `SMTP_*` fields, `EMAIL_ALERT_RECIPIENTS`, and `EMAIL_ALERTS_ENABLED=true`. After a collection run rebuilds reputation clusters, **Elevated** and **Critical** risks create alerts and send one email per severity level. Delivery status, recipients, timestamp, and failure reason are retained. If an Elevated issue later becomes Critical, a new escalation email is sent; repeated runs at the same level are deduplicated.
 
 ---
 
@@ -282,5 +297,6 @@ Deploy to Render, Railway, Fly.io, or AWS App Runner:
 ## Known Limitations & Future Improvements
 
 - **Authentication**: MVP is designed for single marketing teams; multi-tenant RBAC can be added cleanly via SQLAlchemy Organization relationship.
-- **Additional Networks**: Ready for Instagram Graph API, TikTok Creative Center, and YouTube Data API collectors.
-- **Alerting**: Webhook and Slack notification triggers for posts surpassing virality score 90+.
+- **Google API availability**: Google Search collection requires an eligible Custom Search JSON API / Programmable Search Engine configuration; Google News RSS and the curated publisher RSS/Atom feeds remain available independently.
+- **Page access**: Paywalls, robots exclusions, private-network targets, unsupported content types, and unreachable sites remain snippet-only or blocked by design.
+- **Alert channels**: SMTP email is implemented; Slack/Teams/webhook channels are not included.

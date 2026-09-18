@@ -7,6 +7,8 @@ from sqlalchemy.orm import Session, joinedload
 from app.database.session import get_db
 from app.models.post import Post
 from app.models.post_analysis import PostAnalysis
+from app.models.document import Document
+from app.models.competitor import Competitor
 from app.schemas.post import PostResponse
 from app.schemas.common import PaginatedResponse
 
@@ -16,7 +18,7 @@ router = APIRouter(prefix="/posts", tags=["Posts"])
 @router.get("", response_model=PaginatedResponse[PostResponse])
 def get_posts(
     brand_id: Optional[int] = 1,
-    source: Optional[Literal["all", "reddit", "twitter", "facebook", "news_rss", "rss", "web", "mock"]] = None,
+    source: Optional[Literal["all", "news_rss", "rss", "publisher_rss", "google_search", "web"]] = None,
     sentiment: Optional[Literal["all", "Positive", "Negative", "Neutral", "Mixed"]] = None,
     topic: Optional[str] = None,
     product: Optional[str] = None,
@@ -36,7 +38,10 @@ def get_posts(
     Optimized for high throughput and zero N+1 database overhead.
     """
     # Eager load analysis to eliminate N+1 queries
-    query = db.query(Post).options(joinedload(Post.analysis)).outerjoin(PostAnalysis, Post.id == PostAnalysis.post_id)
+    query = db.query(Post).options(
+        joinedload(Post.analysis),
+        joinedload(Post.document).joinedload(Document.snapshots),
+    ).outerjoin(PostAnalysis, Post.id == PostAnalysis.post_id)
 
     # 1. Filter by Brand
     if brand_id:
@@ -60,7 +65,21 @@ def get_posts(
 
     # 6. Filter by Competitor
     if competitor and competitor.lower() != "all":
-        query = query.filter(PostAnalysis.competitor.ilike(f"%{competitor}%"))
+        if competitor.lower() == "any":
+            names = [row[0] for row in db.query(Competitor.name).filter(Competitor.brand_id == brand_id).all()]
+            text_matches = [column.ilike(f"%{name}%") for name in names for column in (Post.title, Post.content)]
+            query = query.filter(or_(
+                PostAnalysis.competitor.isnot(None),
+                PostAnalysis.competitor != "",
+                *text_matches,
+            ))
+        else:
+            competitor_term = f"%{competitor.strip()}%"
+            query = query.filter(or_(
+                PostAnalysis.competitor.ilike(competitor_term),
+                Post.title.ilike(competitor_term),
+                Post.content.ilike(competitor_term),
+            ))
 
     # 7. Filter by Virality Level
     if virality_level and virality_level.lower() != "all":
@@ -68,7 +87,10 @@ def get_posts(
 
     # 8. Viral Only Toggle
     if viral is True:
-        query = query.filter(PostAnalysis.is_viral.is_(True))
+        query = query.filter(or_(
+            PostAnalysis.is_viral.is_(True),
+            PostAnalysis.attention_score >= 40,
+        ))
 
     # 9. Date Range Filtering
     if date_from:
@@ -97,7 +119,11 @@ def get_posts(
     elif sort_by == "highest_engagement":
         query = query.order_by(desc(Post.engagement_count))
     elif sort_by == "highest_virality":
-        query = query.order_by(desc(PostAnalysis.virality_score))
+        query = query.order_by(
+            desc(PostAnalysis.attention_score),
+            desc(PostAnalysis.virality_score),
+            desc(Post.published_at),
+        )
     elif sort_by == "most_negative":
         # Sort negative sentiment posts first, lowest sentiment score
         query = query.order_by(asc(PostAnalysis.sentiment_score))
@@ -128,7 +154,7 @@ def get_viral_posts(
     """Retrieve top viral discussions for the brand."""
     query = (
         db.query(Post)
-        .options(joinedload(Post.analysis))
+        .options(joinedload(Post.analysis), joinedload(Post.document).joinedload(Document.snapshots))
         .join(PostAnalysis, Post.id == PostAnalysis.post_id)
         .filter(Post.brand_id == brand_id)
         .filter(PostAnalysis.is_viral.is_(True))
@@ -143,7 +169,7 @@ def get_post_detail(post_id: int, db: Session = Depends(get_db)):
     """Retrieve complete details and AI analysis for a specific post."""
     post = (
         db.query(Post)
-        .options(joinedload(Post.analysis))
+        .options(joinedload(Post.analysis), joinedload(Post.document).joinedload(Document.snapshots))
         .filter(Post.id == post_id)
         .first()
     )

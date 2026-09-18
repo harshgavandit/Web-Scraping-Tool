@@ -1,5 +1,5 @@
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, Text, Float, Boolean, DateTime, ForeignKey, Index
+from sqlalchemy import Column, Integer, String, Text, Float, Boolean, DateTime, ForeignKey, Index, JSON
 from sqlalchemy.orm import relationship
 from app.models.base import Base, utc_now
 
@@ -21,9 +21,16 @@ class PostAnalysis(Base):
     virality_score = Column(Float, default=0.0, nullable=False, index=True)
     virality_level = Column(String(50), default="Low", nullable=False)  # Low, Medium, High, Viral
     is_viral = Column(Boolean, default=False, nullable=False, index=True)
+    attention_score = Column(Float, default=0.0, nullable=False, index=True)
+    attention_level = Column(String(50), default="Low attention", nullable=False)
+    attention_reasons = Column(JSON, default=list, nullable=False)
+    reputation_risk_score = Column(Float, default=0.0, nullable=False)
+    reputation_risk_level = Column(String(50), default="Monitor", nullable=False)
     analyzed_at = Column(DateTime, default=utc_now, nullable=False)
     analysis_version = Column(String(50), default="1.0", nullable=False)
-    model_used = Column(String(100), default="vader_local", nullable=False)
+    model_used = Column(String(100), default="gemini", nullable=False)
+    analysis_provider = Column(String(50), default="gemini", nullable=False)
+    analysis_status = Column(String(50), default="pending", nullable=False)
 
     post = relationship("Post", back_populates="analysis")
 

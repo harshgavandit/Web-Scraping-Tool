@@ -6,6 +6,7 @@ from app.utils.datetime_utils import utc_now
 
 from app.models.post import Post
 from app.models.post_analysis import PostAnalysis
+from app.models.product_intelligence import IssueCluster, MentionEvidence
 from app.schemas.dashboard import (
     DashboardKPIs, ExecutiveSummary, DashboardSummaryResponse
 )
@@ -143,6 +144,44 @@ def generate_dashboard_summary(
     dominant_sent = "predominantly positive" if pos_pct > 50 else ("largely mixed" if mixed_pct + neg_pct > 40 else "neutral to positive")
     overall_sentiment_str = f"{pos_pct}% positive, {neg_pct}% negative, {mixed_pct + neu_pct}% neutral/mixed."
 
+    # Top risk cluster
+    top_cluster = (
+        db.query(IssueCluster)
+        .filter(IssueCluster.brand_id == brand_id)
+        .order_by(IssueCluster.risk_score.desc(), IssueCluster.mention_count.desc())
+        .first()
+    )
+    top_risk_cluster = top_cluster.title if top_cluster else None
+
+    # Evidence quotes from aspect evidence
+    evidence_rows = (
+        db.query(MentionEvidence.evidence_quote)
+        .join(Post, Post.id == MentionEvidence.post_id)
+        .filter(Post.brand_id == brand_id, Post.published_at >= since_date)
+        .filter(MentionEvidence.sentiment.in_(("Negative", "Mixed")))
+        .limit(3)
+        .all()
+    )
+    evidence_quotes = [row[0] for row in evidence_rows if row[0]]
+
+    # Recommendation ownership & priority
+    if top_cluster and top_cluster.risk_score >= 70:
+        recommendation_priority = "P0"
+    elif neg_pct >= 25 or (top_cluster and top_cluster.risk_score >= 45):
+        recommendation_priority = "P1"
+    else:
+        recommendation_priority = "P2"
+
+    lower_complaint = top_complaint.lower()
+    if any(k in lower_complaint for k in ("customer service", "delivery", "shipping", "refund", "snkrs")):
+        recommendation_owner = "Customer Experience & Fulfillment"
+    elif any(k in lower_complaint for k in ("pricing", "price", "expensive", "cost", "value")):
+        recommendation_owner = "Product Marketing & Commercial Strategy"
+    elif any(k in lower_complaint for k in ("quality", "durability", "comfort", "fit", "sole", "outsole")):
+        recommendation_owner = "Product Engineering & QA"
+    else:
+        recommendation_owner = "Brand Communications & PR"
+
     # Key insight and marketing recommendation synthesis
     key_insight = (
         f"Brand sentiment remains {dominant_sent} led by {top_positive.lower()}, "
@@ -177,6 +216,10 @@ def generate_dashboard_summary(
         most_viral_discussion=most_viral_title,
         key_insight=key_insight,
         recommended_action=recommended_action,
+        recommendation_owner=recommendation_owner,
+        recommendation_priority=recommendation_priority,
+        evidence_quotes=evidence_quotes,
+        top_risk_cluster=top_risk_cluster,
         generated_at=now,
         data_version=f"v_{latest_post_id}"
     )

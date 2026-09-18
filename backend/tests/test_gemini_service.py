@@ -4,7 +4,7 @@ import pytest
 import httpx
 
 from app.core.config import settings
-from app.services.gemini_service import GeminiService
+from app.services.gemini_service import GeminiService, GeminiConfigurationError, GeminiProviderError, GeminiResponseError
 from app.services.ai_service import AIService
 from app.schemas.post_analysis import AIAnalysisItem
 
@@ -79,7 +79,7 @@ def test_gemini_analyze_batch_success(mock_gemini_success_response):
         assert results[1].sentiment == "Mixed"
 
 
-def test_gemini_cannot_override_local_sentiment(mock_gemini_success_response):
+def test_gemini_owns_the_final_sentiment_classification(mock_gemini_success_response):
     svc = GeminiService(api_key="mock-gemini-key", model="gemini-3.8-flash")
     posts = [
         {
@@ -99,43 +99,36 @@ def test_gemini_cannot_override_local_sentiment(mock_gemini_success_response):
     with patch("httpx.Client.post", return_value=mock_gemini_success_response):
         results = svc.analyze_batch(posts)
 
-    assert [item.sentiment for item in results] == ["Negative", "Neutral"]
+    assert [item.sentiment for item in results] == ["Positive", "Mixed"]
 
 
-def test_gemini_missing_key_fallback():
-    # When api_key is empty, zero HTTP calls are made, local heuristic fallback runs
+def test_gemini_missing_key_fails_without_fabricating_analysis():
     svc = GeminiService(api_key="", model="gemini-3.8-flash")
     posts = [
         {"id": 55, "content": "Nike Air Max is stylish but painful on long walks.", "title": "Air Max comfort", "local_sentiment": "Mixed"}
     ]
 
     with patch("httpx.Client.post") as mock_post:
-        results = svc.analyze_batch(posts)
+        with pytest.raises(GeminiConfigurationError):
+            svc.analyze_batch(posts)
         mock_post.assert_not_called()
-        assert len(results) == 1
-        assert results[0].post_id == 55
-        assert results[0].product == "Air Max"
-        assert results[0].summary is not None
-        assert results[0].recommendation is not None
 
 
-def test_gemini_disabled_mode():
+def test_gemini_disabled_mode_fails_without_fabricating_analysis():
     svc = GeminiService(api_key="mock-key", model="gemini-3.8-flash")
     prev_state = settings.AI_ANALYSIS_ENABLED
     try:
         settings.AI_ANALYSIS_ENABLED = False
         posts = [{"id": 77, "content": "Nike shoes are good.", "title": "Shoes", "local_sentiment": "Positive"}]
         with patch("httpx.Client.post") as mock_post:
-            results = svc.analyze_batch(posts)
+            with pytest.raises(GeminiConfigurationError):
+                svc.analyze_batch(posts)
             mock_post.assert_not_called()
-            assert len(results) == 1
-            assert results[0].post_id == 77
     finally:
         settings.AI_ANALYSIS_ENABLED = prev_state
 
 
-def test_gemini_api_error_fallback():
-    # When Gemini returns HTTP 500, service falls back to heuristic analysis without throwing
+def test_gemini_api_error_is_reported_without_fallback():
     svc = GeminiService(api_key="mock-key", model="gemini-3.8-flash")
     posts = [{"id": 88, "content": "Love my Nike Pegasus runners.", "title": "Pegasus", "local_sentiment": "Positive"}]
 
@@ -145,14 +138,11 @@ def test_gemini_api_error_fallback():
 
     with patch("httpx.Client.post", return_value=mock_err_resp):
         with patch("time.sleep"):  # skip actual sleep
-            results = svc.analyze_batch(posts)
-            assert len(results) == 1
-            assert results[0].post_id == 88
-            assert results[0].product == "Pegasus"
+            with pytest.raises(GeminiProviderError):
+                svc.analyze_batch(posts)
 
 
-def test_gemini_partial_or_malformed_response_fallback():
-    # When an item in batch has invalid fields, fallback replaces that specific item
+def test_gemini_partial_or_malformed_response_is_rejected_without_fallback():
     svc = GeminiService(api_key="mock-key", model="gemini-3.8-flash")
     posts = [
         {"id": 1, "content": "Nike Pegasus is great.", "title": "Review 1", "local_sentiment": "Positive"},
@@ -194,56 +184,29 @@ def test_gemini_partial_or_malformed_response_fallback():
     mock_resp.raise_for_status.return_value = None
 
     with patch("httpx.Client.post", return_value=mock_resp):
-        results = svc.analyze_batch(posts)
-        assert len(results) == 2
-        assert results[0].post_id == 1
-        assert results[1].post_id == 2
-        # Post 2 recovered via heuristic fallback
-        assert results[1].competitor == "Puma"
-        assert results[1].summary is not None
+        with pytest.raises(GeminiResponseError):
+            svc.analyze_batch(posts)
 
 
 def test_ai_service_provider_routing_gemini():
     svc = AIService()
-    prev_provider = settings.AI_PROVIDER
     prev_gemini_key = settings.GEMINI_API_KEY
     try:
-        settings.AI_PROVIDER = "gemini"
         settings.GEMINI_API_KEY = "test-gemini-key"
+        assert svc.provider == "gemini"
         assert svc.active_model_name == settings.GEMINI_MODEL
     finally:
-        settings.AI_PROVIDER = prev_provider
         settings.GEMINI_API_KEY = prev_gemini_key
 
 
-def test_ai_service_gemini_to_openai_fallback():
-    # If Gemini fails and OpenAI key is present, fallback to OpenAI
+def test_ai_service_never_routes_gemini_failure_to_another_provider():
     svc = AIService()
-    prev_provider = settings.AI_PROVIDER
     prev_gemini_key = settings.GEMINI_API_KEY
-    prev_openai_key = settings.OPENAI_API_KEY
     try:
-        settings.AI_PROVIDER = "gemini"
         settings.GEMINI_API_KEY = "test-gemini-key"
-        settings.OPENAI_API_KEY = "test-openai-key"
-
         posts = [{"id": 12, "content": "Nike Pegasus", "title": "Nike", "local_sentiment": "Positive"}]
-
-        with patch("app.services.gemini_service.gemini_service.analyze_batch", side_effect=Exception("Gemini network error")):
-            with patch("app.services.openai_service.openai_service.analyze_batch") as mock_openai:
-                mock_openai.return_value = [AIAnalysisItem(
-                    post_id=12,
-                    sentiment="Positive",
-                    topic="Running",
-                    product="Pegasus",
-                    summary="OpenAI fallback summary",
-                    recommendation="OpenAI recommendation"
-                )]
-                results = svc.analyze_batch(posts)
-                assert mock_openai.called
-                assert len(results) == 1
-                assert results[0].summary == "OpenAI fallback summary"
+        with patch("app.services.ai_service.gemini_service.analyze_batch", side_effect=GeminiProviderError("Gemini network error")):
+            with pytest.raises(GeminiProviderError):
+                svc.analyze_batch(posts)
     finally:
-        settings.AI_PROVIDER = prev_provider
         settings.GEMINI_API_KEY = prev_gemini_key
-        settings.OPENAI_API_KEY = prev_openai_key

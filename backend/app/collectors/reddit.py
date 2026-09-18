@@ -2,7 +2,6 @@ import httpx
 from datetime import datetime, timezone
 from typing import List
 from app.collectors.base import BaseCollector, RawPost
-from app.collectors.mock import MockCollector
 from app.core.config import settings
 from app.core.logging import logger
 from app.utils.datetime_utils import utc_now
@@ -24,14 +23,12 @@ class RedditCollector(BaseCollector):
         limit: int = 50
     ) -> List[RawPost]:
         """
-        Collect public Reddit submissions.
-        If credentials are not present, fallback cleanly to high-fidelity mock data.
+        Collect public Reddit submissions using Reddit's permitted OAuth API.
+        An unconfigured collector returns no records; it never fabricates data.
         """
         if not self.is_enabled():
-            logger.info("Reddit credentials not configured or disabled: using mock Reddit data fallback.")
-            mock_collector = MockCollector()
-            all_mock = mock_collector.collect(brand_name, keywords, competitors, limit=50)
-            return [p for p in all_mock if p.source == "reddit"][:limit]
+            logger.info("Reddit collector skipped because OAuth credentials are not configured or it is disabled.")
+            return []
 
         # When credentials are provided, use Reddit OAuth public endpoint
         results: List[RawPost] = []
@@ -50,9 +47,7 @@ class RedditCollector(BaseCollector):
                 )
 
                 if token_resp.status_code != 200:
-                    logger.warning(f"Reddit OAuth token failed ({token_resp.status_code}), falling back to mock.")
-                    mock_collector = MockCollector()
-                    return [p for p in mock_collector.collect(brand_name, keywords, competitors, limit=limit) if p.source == "reddit"]
+                    raise RuntimeError(f"Reddit OAuth token request failed with status {token_resp.status_code}")
 
                 token = token_resp.json().get("access_token")
                 api_headers = {
@@ -93,12 +88,8 @@ class RedditCollector(BaseCollector):
                         )
                     logger.info(f"Reddit collector fetched {len(results)} live posts.")
                     return results
-                else:
-                    logger.warning(f"Reddit search failed ({search_resp.status_code}).")
+                raise RuntimeError(f"Reddit search request failed with status {search_resp.status_code}")
 
         except Exception as e:
             logger.error(f"Reddit collection error: {e}")
-
-        # Fallback if any network / API failure occurs
-        mock_collector = MockCollector()
-        return [p for p in mock_collector.collect(brand_name, keywords, competitors, limit=limit) if p.source == "reddit"]
+            raise

@@ -26,6 +26,10 @@ class ExecutiveSummary(BaseModel):
     most_viral_discussion: str
     key_insight: str
     recommended_action: str
+    recommendation_owner: str = "Brand Strategy"
+    recommendation_priority: str = "P1"
+    evidence_quotes: List[str] = []
+    top_risk_cluster: Optional[str] = None
     generated_at: datetime
     data_version: str
 

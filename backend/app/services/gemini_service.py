@@ -7,18 +7,33 @@ from pydantic import ValidationError
 from app.core.config import settings
 from app.core.logging import logger
 from app.schemas.post_analysis import AIAnalysisItem
-from app.services.openai_service import heuristic_fallback_analyze
+
+
+class GeminiError(RuntimeError):
+    """Base error for Gemini-only analysis failures."""
+
+
+class GeminiConfigurationError(GeminiError):
+    """Raised when Gemini analysis is not configured for use."""
+
+
+class GeminiProviderError(GeminiError):
+    """Raised when Gemini cannot complete a request after bounded retries."""
+
+
+class GeminiResponseError(GeminiError):
+    """Raised when Gemini returns incomplete or invalid structured output."""
 
 
 class GeminiService:
     """
-    Service client for Google Gemini 3.8 Flash (and configured Gemini models).
+    Service client for the configured Google Gemini Flash model.
     Communicates via Google's Gemini REST API with structured JSON output and low-latency batching.
     """
 
     def __init__(self, api_key: Optional[str] = None, model: Optional[str] = None):
         self.api_key = api_key if api_key is not None else settings.GEMINI_API_KEY
-        self.model = model or settings.GEMINI_MODEL or "gemini-3.8-flash"
+        self.model = model or settings.GEMINI_MODEL or "gemini-3.5-flash"
         self.base_url = "https://generativelanguage.googleapis.com/v1beta"
 
     def analyze_batch(
@@ -28,30 +43,24 @@ class GeminiService:
     ) -> List[AIAnalysisItem]:
         """
         Analyze a batch of posts using Gemini 3.8 Flash with structured JSON output.
-        Falls back to local heuristic analysis when API key is unset, disabled, or if API fails.
+        Uses Gemini exclusively. Configuration, provider, and response errors are
+        surfaced to the caller and never replaced with synthetic analysis.
         """
         if not posts:
             return []
 
-        # Graceful local fallback when key is absent or AI is disabled
-        if not self.api_key or not settings.AI_ANALYSIS_ENABLED:
-            logger.info("Gemini API key missing or AI analysis disabled: using local heuristic fallback.")
-            return [
-                heuristic_fallback_analyze(
-                    post_id=p["id"],
-                    content=p["content"],
-                    title=p.get("title"),
-                    local_sentiment=p.get("local_sentiment", "Neutral")
-                )
-                for p in posts
-            ]
+        if not self.api_key:
+            raise GeminiConfigurationError("GEMINI_API_KEY is required for AI analysis.")
+        if not settings.AI_ANALYSIS_ENABLED:
+            raise GeminiConfigurationError("Gemini analysis is disabled by configuration.")
 
         post_summaries = []
         for p in posts:
             post_summaries.append({
                 "id": p["id"],
                 "title": p.get("title", ""),
-                "content": p.get("content", "")[:1000],
+                "content": p.get("content", "")[:2000],
+                "source_url": p.get("source_url"),
                 "local_sentiment": p.get("local_sentiment", "Neutral")
             })
 
@@ -59,15 +68,15 @@ class GeminiService:
             "You are an expert brand listening and social intelligence analyst for brand marketing teams. "
             "Analyze the given batch of social posts about Nike and competitor brands. "
             "For each post, return strict JSON matching the schema with fields: "
-            "post_id (int), sentiment (copy the supplied local_sentiment exactly; do not reclassify it), "
+            "post_id (int), sentiment (classify the article as exactly one of Positive, Negative, Neutral, or Mixed), "
             "topic (short string e.g. 'Running & Performance', 'Product Comfort & Fit', 'Pricing & Value', 'Build Quality & Durability', 'Customer Experience & Delivery', 'Style & Design', 'Sustainability & Ethics'), "
             "product (specific product e.g. 'Pegasus', 'Air Max', 'Air Jordan', 'Nike Running', or null), "
             "competitor (specific competitor e.g. 'Adidas', 'Puma', 'New Balance', 'Under Armour', or null), "
-            "summary (1-2 concise sentences summarizing the discussion), "
+            "summary (1-2 concise sentences grounded only in this exact article; name its specific subject, product, claim, event, praise, or complaint so every summary is distinguishable from every other article), "
             "key_positive (short phrase or null), "
             "key_negative (short phrase or null), "
             "recommendation (1-2 practical, actionable marketing/business recommendations for Nike). "
-            "Do not invent facts not in the post."
+            "Do not invent facts not in the post. Never return generic phrases such as 'general brand chatter', 'brand discussion', or wording that could apply unchanged to another article."
         )
 
         user_content = (
@@ -128,14 +137,17 @@ class GeminiService:
                     # Extract generated text from candidates
                     candidates = data.get("candidates", [])
                     if not candidates:
-                        raise ValueError("No candidates returned by Gemini API")
+                        raise GeminiResponseError("No candidates returned by Gemini API")
 
                     parts = candidates[0].get("content", {}).get("parts", [])
                     if not parts or "text" not in parts[0]:
-                        raise ValueError("No text part returned by Gemini API")
+                        raise GeminiResponseError("No text part returned by Gemini API")
 
                     raw_text = parts[0]["text"]
-                    parsed = json.loads(raw_text)
+                    try:
+                        parsed = json.loads(raw_text)
+                    except (TypeError, json.JSONDecodeError) as exc:
+                        raise GeminiResponseError("Gemini returned invalid JSON.") from exc
 
                     items = parsed.get("items") or parsed.get("posts") or []
                     results: List[AIAnalysisItem] = []
@@ -147,48 +159,29 @@ class GeminiService:
                             continue
                         try:
                             validated = AIAnalysisItem(**item)
-                            # VADER/local rules own sentiment classification. Gemini is used only
-                            # for semantic extraction, summaries, and recommendations.
-                            validated.sentiment = p_match.get("local_sentiment", "Neutral")
-                            results.append(validated)
-                        except ValidationError as ve:
-                            logger.warning(f"Validation error for item in Gemini batch: {ve}")
-                            results.append(heuristic_fallback_analyze(
-                                post_id=p_match["id"],
-                                content=p_match["content"],
-                                title=p_match.get("title"),
-                                local_sentiment=p_match.get("local_sentiment", "Neutral")
-                            ))
+                        except ValidationError as exc:
+                            raise GeminiResponseError(f"Gemini returned an invalid analysis item: {exc}") from exc
+                        validated.analysis_provider = "gemini"
+                        validated.analysis_status = "completed"
+                        results.append(validated)
 
-                    # Ensure all posts in the batch are accounted for
+                    # A partial response is not silently completed with fabricated data.
                     returned_ids = {r.post_id for r in results}
-                    for p in posts:
-                        if p["id"] not in returned_ids:
-                            results.append(heuristic_fallback_analyze(
-                                post_id=p["id"],
-                                content=p["content"],
-                                title=p.get("title"),
-                                local_sentiment=p.get("local_sentiment", "Neutral")
-                            ))
+                    missing_ids = {p["id"] for p in posts} - returned_ids
+                    if missing_ids:
+                        raise GeminiResponseError(f"Gemini omitted post IDs: {sorted(missing_ids)}")
 
                     return results
 
+            except GeminiResponseError:
+                raise
             except Exception as e:
                 logger.error(f"Gemini API call failed (attempt {attempt + 1}/{max_retries}): {e}")
                 if attempt < max_retries - 1:
                     time.sleep(backoff)
                     backoff *= 2
                 else:
-                    logger.warning("Falling back to local heuristic analysis for this batch due to persistent Gemini error.")
-                    return [
-                        heuristic_fallback_analyze(
-                            post_id=p["id"],
-                            content=p["content"],
-                            title=p.get("title"),
-                            local_sentiment=p.get("local_sentiment", "Neutral")
-                        )
-                        for p in posts
-                    ]
+                    raise GeminiProviderError(f"Gemini analysis failed after {max_retries} attempts: {e}") from e
 
         return []
 

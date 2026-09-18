@@ -32,7 +32,7 @@ def analyze_local_sentiment(text: str) -> Tuple[str, float, bool]:
       (sentiment_label: str, sentiment_score: float, needs_deeper_ai: bool)
       sentiment_label is one of: Positive, Negative, Neutral, Mixed.
       sentiment_score is compound score between -1.0 and 1.0.
-      needs_deeper_ai is True when ambiguity, sarcasm, or mixed complexity warrants OpenAI.
+      needs_deeper_ai is True when ambiguity, sarcasm, or mixed complexity warrants Gemini analysis.
     """
     if not text or not text.strip():
         return "Neutral", 0.0, False

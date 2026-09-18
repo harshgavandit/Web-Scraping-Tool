@@ -21,5 +21,5 @@ class CollectionRunResponse(CollectionRunBase):
 
 
 class CollectionRunTrigger(BaseModel):
-    source: Literal["all", "reddit", "facebook", "rss", "web", "mock"] = "all"
+    source: Literal["all", "rss", "publisher_rss", "google_search"] = "all"
     brand_id: int = Field(default=1, ge=1)

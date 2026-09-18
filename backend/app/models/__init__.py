@@ -6,6 +6,11 @@ from app.models.tracked_keyword import TrackedKeyword
 from app.models.post import Post
 from app.models.post_analysis import PostAnalysis
 from app.models.collection_run import CollectionRun
+from app.models.search_discovery import SearchQuery, SearchRun, SearchResult
+from app.models.document import Document, DocumentSnapshot
+from app.models.product_intelligence import Product, MentionEvidence, IssueCluster
+from app.models.alert import Alert
+from app.models.saved_view import SavedView
 
 __all__ = [
     "Base",
@@ -16,4 +21,14 @@ __all__ = [
     "Post",
     "PostAnalysis",
     "CollectionRun",
+    "SearchQuery",
+    "SearchRun",
+    "SearchResult",
+    "Document",
+    "DocumentSnapshot",
+    "Product",
+    "MentionEvidence",
+    "IssueCluster",
+    "Alert",
+    "SavedView",
 ]

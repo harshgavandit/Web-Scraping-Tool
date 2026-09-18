@@ -2,6 +2,7 @@ from datetime import datetime
 from typing import Optional, Dict, Any
 from pydantic import BaseModel, ConfigDict
 from app.schemas.post_analysis import PostAnalysisResponse
+from app.schemas.document import DocumentResponse
 
 
 class PostBase(BaseModel):
@@ -30,5 +31,6 @@ class PostResponse(PostBase):
     id: int
     collected_at: datetime
     analysis: Optional[PostAnalysisResponse] = None
+    document: Optional[DocumentResponse] = None
 
     model_config = ConfigDict(from_attributes=True)

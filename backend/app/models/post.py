@@ -30,6 +30,7 @@ class Post(Base):
 
     brand = relationship("Brand", back_populates="posts")
     analysis = relationship("PostAnalysis", back_populates="post", uselist=False, cascade="all, delete-orphan")
+    document = relationship("Document", back_populates="post", uselist=False, cascade="all, delete-orphan")
 
     __table_args__ = (
         UniqueConstraint("source", "external_id", name="uq_source_external_id"),

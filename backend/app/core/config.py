@@ -12,12 +12,9 @@ class Settings(BaseSettings):
     # Database
     DATABASE_URL: str = "sqlite:///./brand_chatter.db"
 
-    # AI Provider Settings (gemini or openai)
-    AI_PROVIDER: str = "gemini"
+    # Gemini is the only semantic analysis provider.
     GEMINI_API_KEY: str = ""
-    GEMINI_MODEL: str = "gemini-3.8-flash"
-    OPENAI_API_KEY: str = ""
-    OPENAI_MODEL: str = "gpt-4o-mini"
+    GEMINI_MODEL: str = "gemini-3.5-flash"
     AI_ANALYSIS_ENABLED: bool = True
     AI_BATCH_SIZE: int = 20
 
@@ -33,10 +30,33 @@ class Settings(BaseSettings):
 
     # Web & RSS Collector
     RSS_ENABLED: bool = True
+    PUBLISHER_RSS_ENABLED: bool = True
+    # Optional newline-separated entries: "Publisher name|https://publisher.example/feed".
+    # An empty value uses the curated Nike publisher feed allowlist.
+    PUBLISHER_RSS_FEEDS: str = ""
+    GOOGLE_SEARCH_ENABLED: bool = False
+    GOOGLE_SEARCH_API_KEY: str = ""
+    GOOGLE_SEARCH_ENGINE_ID: str = ""
+    GOOGLE_SEARCH_ENDPOINT: str = "https://customsearch.googleapis.com/customsearch/v1"
+    GOOGLE_SEARCH_COUNTRY: str = "US"
+    GOOGLE_SEARCH_LANGUAGE: str = "en"
+    PAGE_FETCH_ENABLED: bool = True
+    PAGE_FETCH_LIMIT_PER_RUN: int = 30
 
     # Scheduler & Pipeline
     COLLECTION_INTERVAL_MINUTES: int = 60
     VIRAL_THRESHOLD: int = 85
+
+    # Enterprise email alerts (disabled until explicitly configured)
+    EMAIL_ALERTS_ENABLED: bool = False
+    EMAIL_ALERT_RECIPIENTS: str = ""
+    SMTP_HOST: str = ""
+    SMTP_PORT: int = 587
+    SMTP_USERNAME: str = ""
+    SMTP_PASSWORD: str = ""
+    SMTP_FROM_EMAIL: str = ""
+    SMTP_USE_TLS: bool = True
+    APP_PUBLIC_URL: str = "http://localhost:5173"
 
     # CORS & Network
     CORS_ORIGINS: Union[str, List[str]] = "http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173"

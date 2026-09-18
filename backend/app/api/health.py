@@ -20,10 +20,8 @@ def health_check(db: Session = Depends(get_db)):
         "status": "ok" if db_status == "ok" else "degraded",
         "database": db_status,
         "database_type": "sqlite" if settings.DATABASE_URL.startswith("sqlite") else "postgresql",
-        "ai_provider": settings.AI_PROVIDER,
+        "ai_provider": "gemini",
         "gemini_configured": bool(settings.GEMINI_API_KEY),
         "gemini_model": settings.GEMINI_MODEL,
-        "openai_configured": bool(settings.OPENAI_API_KEY),
-        "openai_model": settings.OPENAI_MODEL,
         "version": settings.VERSION
     }

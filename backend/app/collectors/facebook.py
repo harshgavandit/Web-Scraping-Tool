@@ -2,7 +2,6 @@ import httpx
 from datetime import datetime
 from typing import List
 from app.collectors.base import BaseCollector, RawPost
-from app.collectors.mock import MockCollector
 from app.core.config import settings
 from app.core.logging import logger
 from app.utils.datetime_utils import utc_now
@@ -24,22 +23,25 @@ class FacebookCollector(BaseCollector):
         limit: int = 50
     ) -> List[RawPost]:
         """
-        Collect public Facebook Page posts or discussions via Graph API.
-        If credentials/token not configured, fallback gracefully to mock Facebook data.
+        Collect public Facebook Page posts via the permitted Graph API.
+        An unconfigured collector returns no records; it never fabricates data.
         """
         if not self.is_enabled():
-            logger.info("Facebook API access token not configured or disabled: using mock Facebook data fallback.")
-            mock_collector = MockCollector()
-            all_mock = mock_collector.collect(brand_name, keywords, competitors, limit=50)
-            return [p for p in all_mock if p.source == "facebook"][:limit]
+            logger.info("Facebook collector skipped because its access token is not configured or it is disabled.")
+            return []
 
         results: List[RawPost] = []
         try:
             # Using permitted public Graph API page feed endpoint
             # e.g., https://graph.facebook.com/v19.0/{page-id}/feed
-            api_url = f"https://graph.facebook.com/v19.0/nike/feed?fields=id,message,created_time,shares,comments.summary(true),likes.summary(true)&access_token={settings.FACEBOOK_ACCESS_TOKEN}"
+            api_url = "https://graph.facebook.com/v19.0/nike/feed"
+            params = {
+                "fields": "id,message,permalink_url,created_time,shares,comments.summary(true),likes.summary(true)",
+                "access_token": settings.FACEBOOK_ACCESS_TOKEN,
+                "limit": min(limit, 100),
+            }
             with httpx.Client(timeout=10.0) as client:
-                resp = client.get(api_url)
+                resp = client.get(api_url, params=params)
                 if resp.status_code == 200:
                     data = resp.json().get("data", [])
                     for item in data:
@@ -50,12 +52,13 @@ class FacebookCollector(BaseCollector):
                         shares = item.get("shares", {}).get("count", 0)
 
                         message = item.get("message", "")
-                        if message:
+                        permalink = item.get("permalink_url")
+                        if message and permalink:
                             results.append(
                                 RawPost(
                                     source="facebook",
                                     external_id=item.get("id"),
-                                    url=f"https://facebook.com/{item.get('id')}",
+                                    url=permalink,
                                     author="Nike Official Page",
                                     title=message[:60] + "...",
                                     content=message,
@@ -68,10 +71,7 @@ class FacebookCollector(BaseCollector):
                             )
                     logger.info(f"Facebook collector fetched {len(results)} live posts.")
                     return results
-                else:
-                    logger.warning(f"Facebook Graph API request returned {resp.status_code}.")
+                raise RuntimeError(f"Facebook Graph API request failed with status {resp.status_code}")
         except Exception as e:
             logger.error(f"Facebook collection error: {e}")
-
-        mock_collector = MockCollector()
-        return [p for p in mock_collector.collect(brand_name, keywords, competitors, limit=limit) if p.source == "facebook"]
+            raise

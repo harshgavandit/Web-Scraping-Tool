@@ -10,8 +10,12 @@ from app.api.brands import router as brands_router
 from app.api.posts import router as posts_router
 from app.api.dashboard import router as dashboard_router
 from app.api.topics import router as topics_router
+from app.api.intelligence import router as intelligence_router
 from app.api.collection import router as collection_router
 from app.api.analysis import router as analysis_router
+from app.api.alerts import router as alerts_router
+from app.api.saved_views import router as saved_views_router
+from app.api.audit import router as audit_router
 
 
 @asynccontextmanager
@@ -46,8 +50,12 @@ app.include_router(brands_router, prefix=settings.API_V1_STR)
 app.include_router(posts_router, prefix=settings.API_V1_STR)
 app.include_router(dashboard_router, prefix=settings.API_V1_STR)
 app.include_router(topics_router, prefix=settings.API_V1_STR)
+app.include_router(intelligence_router, prefix=settings.API_V1_STR)
 app.include_router(collection_router, prefix=settings.API_V1_STR)
 app.include_router(analysis_router, prefix=settings.API_V1_STR)
+app.include_router(alerts_router, prefix=settings.API_V1_STR)
+app.include_router(saved_views_router, prefix=settings.API_V1_STR)
+app.include_router(audit_router, prefix=settings.API_V1_STR)
 
 
 @app.get("/")

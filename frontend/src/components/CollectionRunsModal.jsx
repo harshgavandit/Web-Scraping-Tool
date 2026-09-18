@@ -2,16 +2,21 @@ import React, { useState, useEffect } from 'react';
 import { X, Play, RefreshCw, CheckCircle, AlertCircle, Clock } from 'lucide-react';
 import { api } from '../services/api';
 
-export default function CollectionRunsModal({ onClose, onCollectionComplete }) {
+export default function CollectionRunsModal({ brandId = 1, onClose, onCollectionComplete }) {
   const [runs, setRuns] = useState([]);
+  const [health, setHealth] = useState(null);
   const [loading, setLoading] = useState(true);
   const [running, setRunning] = useState(false);
   const [selectedSource, setSelectedSource] = useState('all');
 
   const fetchRuns = async () => {
     try {
-      const data = await api.getCollectionRuns();
-      setRuns(data);
+      const [runData, healthData] = await Promise.all([
+        api.getCollectionRuns(),
+        api.getDiscoveryHealth(brandId),
+      ]);
+      setRuns(runData);
+      setHealth(healthData);
     } catch (err) {
       console.error(err);
     } finally {
@@ -26,7 +31,7 @@ export default function CollectionRunsModal({ onClose, onCollectionComplete }) {
   const handleTrigger = async () => {
     setRunning(true);
     try {
-      await api.triggerCollection({ source: selectedSource, brand_id: 1 });
+      await api.triggerCollection({ source: selectedSource, brand_id: brandId });
       await fetchRuns();
       if (onCollectionComplete) onCollectionComplete();
     } catch (err) {
@@ -42,12 +47,13 @@ export default function CollectionRunsModal({ onClose, onCollectionComplete }) {
         {/* Header */}
         <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50 dark:bg-slate-850">
           <div>
-            <h2 className="text-base font-bold text-slate-900 dark:text-white">Data Collectors & Run Pipeline</h2>
-            <p className="text-xs text-slate-500 dark:text-slate-400">Trigger on-demand collection and review historical collection logs</p>
+            <h2 className="text-base font-bold text-slate-900 dark:text-white">Live Brand Discovery Pipeline</h2>
+            <p className="text-xs text-slate-500 dark:text-slate-400">Collect public Google News and publisher RSS/Atom coverage</p>
           </div>
           <button
             type="button"
             onClick={onClose}
+            aria-label="Close Google discovery pipeline"
             className="p-1 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 rounded-lg"
           >
             <X className="w-5 h-5" />
@@ -63,12 +69,10 @@ export default function CollectionRunsModal({ onClose, onCollectionComplete }) {
               onChange={(e) => setSelectedSource(e.target.value)}
               className="bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 py-1.5 focus:ring-2 focus:ring-slate-900 dark:focus:ring-slate-400 font-medium text-slate-800 dark:text-slate-200 flex-1 sm:flex-initial"
             >
-              <option value="all">All Sources (Parallel Pipeline)</option>
-              <option value="mock">Mock Feeds (Instant 50+)</option>
-              <option value="reddit">Reddit (Permitted API / Mock)</option>
-              <option value="rss">News & Press RSS</option>
-              <option value="facebook">Facebook (Graph API / Mock)</option>
-              <option value="web">Web & Blogs</option>
+              <option value="all">All Live Sources</option>
+              <option value="rss">Google News</option>
+              <option value="publisher_rss">Publisher RSS / Atom</option>
+              <option value="google_search">Google Search</option>
             </select>
           </div>
 
@@ -91,6 +95,22 @@ export default function CollectionRunsModal({ onClose, onCollectionComplete }) {
             )}
           </button>
         </div>
+
+        {health && (
+          <div className="grid grid-cols-2 gap-px border-b border-slate-200 bg-slate-200 dark:border-slate-800 dark:bg-slate-800 sm:grid-cols-4" aria-label="Google discovery health">
+            {[
+              ['Queries', health.configured_queries],
+              ['Results', health.discovered_results],
+              ['Domains', health.unique_domains],
+              ['Failed runs', health.failed_query_runs],
+            ].map(([label, value]) => (
+              <div key={label} className="bg-white px-4 py-3 dark:bg-slate-900">
+                <div className="text-lg font-bold text-slate-900 dark:text-white">{value}</div>
+                <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">{label}</div>
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* Runs History Table */}
         <div className="p-4 max-h-[60vh] overflow-y-auto text-xs">
@@ -158,4 +178,3 @@ export default function CollectionRunsModal({ onClose, onCollectionComplete }) {
     </div>
   );
 }
-

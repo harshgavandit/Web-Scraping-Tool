@@ -1,5 +1,6 @@
 from typing import List
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response, status
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.database.session import get_db
@@ -69,6 +70,13 @@ def add_keyword(brand_id: int, payload: TrackedKeywordCreate, db: Session = Depe
     if not brand:
         raise HTTPException(status_code=404, detail="Brand not found")
 
+    duplicate = db.query(TrackedKeyword).filter(
+        TrackedKeyword.brand_id == brand_id,
+        func.lower(TrackedKeyword.keyword) == payload.keyword.casefold(),
+    ).first()
+    if duplicate:
+        raise HTTPException(status_code=409, detail="This keyword or product is already tracked")
+
     keyword = TrackedKeyword(
         brand_id=brand_id,
         keyword=payload.keyword,
@@ -88,8 +96,43 @@ def add_competitor(brand_id: int, payload: CompetitorCreate, db: Session = Depen
     if not brand:
         raise HTTPException(status_code=404, detail="Brand not found")
 
+    duplicate = db.query(Competitor).filter(
+        Competitor.brand_id == brand_id,
+        func.lower(Competitor.name) == payload.name.casefold(),
+    ).first()
+    if duplicate:
+        raise HTTPException(status_code=409, detail="This competitor is already tracked")
+
     competitor = Competitor(brand_id=brand_id, name=payload.name)
     db.add(competitor)
     db.commit()
     db.refresh(competitor)
     return competitor
+
+
+@router.delete("/{brand_id}/keywords/{keyword_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_keyword(brand_id: int, keyword_id: int, db: Session = Depends(get_db)):
+    """Remove one keyword owned by the selected brand."""
+    keyword = db.query(TrackedKeyword).filter(
+        TrackedKeyword.id == keyword_id,
+        TrackedKeyword.brand_id == brand_id,
+    ).first()
+    if not keyword:
+        raise HTTPException(status_code=404, detail="Tracked keyword not found for this brand")
+    db.delete(keyword)
+    db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.delete("/{brand_id}/competitors/{competitor_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_competitor(brand_id: int, competitor_id: int, db: Session = Depends(get_db)):
+    """Remove one competitor owned by the selected brand."""
+    competitor = db.query(Competitor).filter(
+        Competitor.id == competitor_id,
+        Competitor.brand_id == brand_id,
+    ).first()
+    if not competitor:
+        raise HTTPException(status_code=404, detail="Tracked competitor not found for this brand")
+    db.delete(competitor)
+    db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

@@ -43,7 +43,7 @@ export default function ChatterTable({
 
   if (loading) {
     return (
-      <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-subtle dark:border-slate-800 dark:bg-slate-900" aria-label="Loading brand conversations" aria-busy="true">
+      <section className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white/90 shadow-[0_10px_28px_rgba(15,23,42,0.045)] dark:border-slate-800 dark:bg-slate-900/85" aria-label="Loading brand conversations" aria-busy="true">
         <div className="grid min-w-[760px] grid-cols-[2.2fr_1.1fr_1fr_1.1fr_1.8fr_44px] gap-5 border-b border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-800 dark:bg-slate-950/40">
           {[28, 18, 16, 20, 30, 6].map((width, index) => <div key={index} className="h-3 rounded bg-slate-200 dark:bg-slate-800 animate-pulse" style={{ width: `${width * 3}px` }} />)}
         </div>
@@ -60,8 +60,8 @@ export default function ChatterTable({
 
   if (!posts?.length) {
     return (
-      <section className="rounded-xl border border-slate-200 bg-white px-6 py-14 text-center shadow-subtle dark:border-slate-800 dark:bg-slate-900">
-        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500"><MessageSquare className="h-5 w-5" /></div>
+      <section className="rounded-2xl border border-dashed border-slate-200 bg-white/90 px-6 py-14 text-center shadow-[0_10px_28px_rgba(15,23,42,0.045)] dark:border-slate-700 dark:bg-slate-900/85">
+        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-500 dark:bg-indigo-950/50 dark:text-indigo-300"><MessageSquare className="h-5 w-5" /></div>
         <h3 className="mt-4 text-sm font-semibold text-slate-900 dark:text-white">No conversations found</h3>
         <p className="mx-auto mt-1.5 max-w-sm text-xs leading-5 text-slate-500 dark:text-slate-400">Try changing your filters or expanding the analysis window.</p>
         {onResetFilters && <button type="button" onClick={onResetFilters} className="mt-4 inline-flex h-9 items-center gap-1.5 rounded-lg bg-slate-900 px-3 text-xs font-semibold text-white transition hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/50 dark:bg-white dark:text-slate-950"><RotateCcw className="h-3.5 w-3.5" />Clear filters</button>}
@@ -70,8 +70,8 @@ export default function ChatterTable({
   }
 
   return (
-    <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-subtle dark:border-slate-800 dark:bg-slate-900" aria-label="Brand conversations">
-      <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3 dark:border-slate-800">
+    <section className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white/90 shadow-[0_10px_28px_rgba(15,23,42,0.045)] dark:border-slate-800 dark:bg-slate-900/85" aria-label="Brand conversations">
+      <div className="flex items-center justify-between border-b border-slate-200/80 px-4 py-3.5 dark:border-slate-800">
         <div>
           <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Brand conversations</h2>
           <p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">Open a conversation for complete AI analysis and recommended action.</p>
@@ -150,8 +150,8 @@ export default function ChatterTable({
                     </td>
 
                     <td className="hidden px-3 py-3 align-top xl:table-cell">
-                      <p className="line-clamp-2 text-[11px] leading-4 text-slate-600 dark:text-slate-300" title={analysis.summary}>{analysis.summary || 'AI summary unavailable.'}</p>
-                      <div className="mt-2 flex items-start gap-1.5 rounded-lg border border-emerald-200/70 bg-emerald-50/70 p-2 text-[10px] leading-4 text-emerald-900 dark:border-emerald-800/50 dark:bg-emerald-950/30 dark:text-emerald-200"><Target className="mt-0.5 h-3 w-3 shrink-0" /><span className="line-clamp-2">{analysis.recommendation || 'Continue monitoring.'}</span></div>
+                      <p className="line-clamp-2 text-[11px] leading-4 text-slate-600 dark:text-slate-300" title={analysis.summary}>{analysis.summary || 'Gemini analysis pending.'}</p>
+                      <div className="mt-2 flex items-start gap-1.5 rounded-lg border border-emerald-200/70 bg-emerald-50/70 p-2 text-[10px] leading-4 text-emerald-900 dark:border-emerald-800/50 dark:bg-emerald-950/30 dark:text-emerald-200"><Target className="mt-0.5 h-3 w-3 shrink-0" /><span className="line-clamp-2">{analysis.recommendation || 'Waiting for Gemini recommendation.'}</span></div>
                     </td>
 
                     <td className="px-3 py-3 text-right align-top">
@@ -164,7 +164,7 @@ export default function ChatterTable({
                       <td colSpan={6} className="px-5 py-4 sm:pl-12">
                         <div className="grid gap-4 lg:grid-cols-[1.5fr_1fr]">
                           <div><div className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Full conversation</div><p className="mt-2 whitespace-pre-wrap text-xs leading-5 text-slate-700 dark:text-slate-200">{post.content}</p></div>
-                          <div className="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900"><div className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">AI signal</div><p className="mt-2 text-xs leading-5 text-slate-700 dark:text-slate-200">{analysis.summary || 'AI summary unavailable.'}</p>{analysis.key_positive && <p className="mt-2 text-[11px] text-emerald-700 dark:text-emerald-300"><strong>Positive:</strong> {analysis.key_positive}</p>}{analysis.key_negative && <p className="mt-1 text-[11px] text-rose-700 dark:text-rose-300"><strong>Concern:</strong> {analysis.key_negative}</p>}</div>
+                          <div className="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900"><div className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">AI signal</div><p className="mt-2 text-xs leading-5 text-slate-700 dark:text-slate-200">{analysis.summary || 'Gemini analysis pending.'}</p>{analysis.key_positive && <p className="mt-2 text-[11px] text-emerald-700 dark:text-emerald-300"><strong>Positive:</strong> {analysis.key_positive}</p>}{analysis.key_negative && <p className="mt-1 text-[11px] text-rose-700 dark:text-rose-300"><strong>Concern:</strong> {analysis.key_negative}</p>}</div>
                         </div>
                       </td>
                     </tr>

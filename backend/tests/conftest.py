@@ -24,8 +24,8 @@ from app.services.gemini_service import gemini_service
 def prevent_real_ai_calls(monkeypatch):
     """Automated tests must never inherit real provider credentials."""
     monkeypatch.setattr(settings, "GEMINI_API_KEY", "")
-    monkeypatch.setattr(settings, "OPENAI_API_KEY", "")
     monkeypatch.setattr(gemini_service, "api_key", "")
+    monkeypatch.setattr(settings, "PAGE_FETCH_ENABLED", False, raising=False)
 
 @pytest.fixture
 def db_session():

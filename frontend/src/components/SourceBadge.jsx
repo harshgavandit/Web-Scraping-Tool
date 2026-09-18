@@ -35,7 +35,25 @@ export default function SourceBadge({ source }) {
     return (
       <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/80 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800/50">
         <Rss className="w-3 h-3 text-emerald-600 dark:text-emerald-400 shrink-0" />
-        News RSS
+        Google News
+      </span>
+    );
+  }
+
+  if (s === 'publisher_rss') {
+    return (
+      <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-violet-50 text-violet-700 border border-violet-200/80 dark:bg-violet-950/40 dark:text-violet-300 dark:border-violet-800/50">
+        <Rss className="w-3 h-3 text-violet-600 dark:text-violet-400 shrink-0" />
+        Publisher RSS
+      </span>
+    );
+  }
+
+  if (s === 'google_search') {
+    return (
+      <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-blue-50 text-blue-700 border border-blue-200/80 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-800/50">
+        <Globe className="w-3 h-3 text-blue-600 dark:text-blue-400 shrink-0" />
+        Google Search
       </span>
     );
   }
@@ -47,4 +65,3 @@ export default function SourceBadge({ source }) {
     </span>
   );
 }
-
